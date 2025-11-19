@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-04-10',
+  apiVersion: '2024-04-10' as any, // ⬅️ ここに `as any` を追加！
 });
 const productId = process.env.STRIPE_PRODUCT_ID!;
 

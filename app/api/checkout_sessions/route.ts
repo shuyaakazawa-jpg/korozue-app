@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // 1. Stripe（サーバー側）の道具を、シークレットキーで初期化
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-04-10', // Stripeのバージョン
+  apiVersion: '2024-04-10' as any, // ⬅️ ここに `as any` を追加！
 });
 
 // 2. 「購入ボタン」が押された時に、ここが呼び出される
