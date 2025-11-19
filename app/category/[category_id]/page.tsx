@@ -1,9 +1,8 @@
 'use client';
 
-// ⚠️ 階層が変わるのでパスの「../」は3回になります
 import { supabaseBrowserClient } from '../../../lib/supabaseBrowserClient';
 import Link from 'next/link';
-import { useRouter, useParams } from 'next/navigation'; // ⬅️ useParamsを追加
+import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 
 import {
@@ -20,7 +19,7 @@ import {
   Loader,
   Stack,
   Avatar,
-  Alert // ⬅️ アラート用
+  Alert
 } from '@mantine/core';
 import { IconArrowLeft, IconArrowRight, IconInfoCircle } from '@tabler/icons-react';
 
@@ -47,8 +46,8 @@ type Category = {
 
 export default function CategoryPage() {
   const router = useRouter();
-  const params = useParams(); // ⬅️ URLからIDを取得する道具
-  const categoryId = params.category_id as string; // URLの [category_id] 部分
+  const params = useParams();
+  const categoryId = params.category_id as string;
 
   const supabase = supabaseBrowserClient;
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -56,36 +55,32 @@ export default function CategoryPage() {
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [currentCategoryName, setCurrentCategoryName] = useState<string>(''); // ⬅️ 表示中のカテゴリ名
+  const [currentCategoryName, setCurrentCategoryName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function getData() {
-      // 1. ユーザー取得
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
-      // 2. サイドバー用の全カテゴリ取得
       const { data: categoriesData } = await supabase
         .from('categories')
         .select('id, name')
         .order('name', { ascending: true });
       setCategories(categoriesData || []);
 
-      // 3. 現在表示しているカテゴリの名前を取得
       if (categoriesData) {
         const current = categoriesData.find(c => c.id === categoryId);
         if (current) setCurrentCategoryName(current.name);
       }
 
-      // 4. レポート一覧を取得（★ここでカテゴリIDで絞り込み！）
       const { data: reportsData, error: reportsError } = await supabase
         .from('reports')
         .select(`
           report_id, title, free_summary, price, stripe_price_id,
           profiles (username, avatar_url)
         `)
-        .eq('category_id', categoryId); // ⬅️ ⭐️ ここが重要！カテゴリでフィルタリング
+        .eq('category_id', categoryId);
 
       if (reportsError) {
         console.error('Error fetching reports:', reportsError);
@@ -99,9 +94,8 @@ export default function CategoryPage() {
       setIsLoading(false);
     }
     getData();
-  }, [supabase, categoryId]); // categoryIdが変わったら再実行
+  }, [supabase, categoryId]);
 
-  // ログアウト処理
   async function handleSignOut() {
     await supabase.auth.signOut();
     setUser(null);
@@ -109,7 +103,6 @@ export default function CategoryPage() {
     router.refresh();
   }
 
-  // 決済処理
   async function handleCheckout(priceId: string) {
     if (!user) {
       alert('購入するにはログインが必要です。');
@@ -152,28 +145,29 @@ export default function CategoryPage() {
 
   return (
     <Flex>
-      {/* --- サイドバー (トップページと同じ) --- */}
-      {/* @ts-ignore */}
+      {/* --- サイドバー --- */}
       <Box
         component="nav"
         p="md"
-        sx={(theme) => ({
+        // ⬇️ ⭐️ エラー回避のため、ここを `any` でキャストしました！
+        sx={(theme: any) => ({
           display: 'none',
           [theme.fn.largerThan('sm')]: { display: 'block' },
           minWidth: 240,
           borderRight: `1px solid ${theme.colors.gray[2]}`,
           minHeight: '100vh'
-        })}
+        }) as any}
       >
         <Text weight={700} mb="md" size="lg">カテゴリ</Text>
         <Stack spacing="xs">
           <Text
             component={Link} href="/" size="sm" c="dimmed"
-            sx={(theme) => ({
+            // ⬇️ ⭐️ ここも `any` でキャスト！
+            sx={(theme: any) => ({
               display: 'block', padding: '8px 12px', borderRadius: theme.radius.sm,
               '&:hover': { backgroundColor: theme.colors.gray[0], color: theme.black, transform: 'scale(1.02)' },
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'all 0.1s ease',
-            })}
+            }) as any}
           >
             すべて
           </Text>
@@ -181,13 +175,14 @@ export default function CategoryPage() {
             <Text
               key={category.id}
               component={Link} href={`/category/${category.id}`} size="sm"
-              c={category.id === categoryId ? "blue" : "dimmed"} // 選択中のカテゴリは青色に
+              c={category.id === categoryId ? "blue" : "dimmed"}
               weight={category.id === categoryId ? 700 : 400}
-              sx={(theme) => ({
+              // ⬇️ ⭐️ ここも `any` でキャスト！
+              sx={(theme: any) => ({
                 display: 'block', padding: '8px 12px', borderRadius: theme.radius.sm,
                 '&:hover': { backgroundColor: theme.colors.gray[0], color: theme.black, transform: 'scale(1.02)' },
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'all 0.1s ease',
-              })}
+              }) as any}
             >
               {category.name}
             </Text>
@@ -197,17 +192,14 @@ export default function CategoryPage() {
 
       {/* --- メインコンテンツ --- */}
       <Box component="main" p="md" style={{ flex: 1, overflow: 'hidden' }}>
-        {/* タイトルを表示 */}
         <Title order={1}>{currentCategoryName}</Title>
         <Text c="dimmed">{currentCategoryName}に関する失敗レポート一覧です。</Text>
 
         {reports.length === 0 ? (
-          // 5. ⬇️ 投稿がない場合の表示
           <Alert icon={<IconInfoCircle size={16} />} title="投稿がありません" color="gray" mt="xl">
             {currentCategoryName} の投稿はまだありません。あなたが最初の投稿者になりませんか？
           </Alert>
         ) : (
-          // 投稿がある場合はスライダーを表示
           <>
             <Group position="apart" style={{ marginTop: '30px' }}>
               <Title order={2}>レポート一覧</Title>
