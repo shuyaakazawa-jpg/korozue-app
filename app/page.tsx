@@ -4,7 +4,7 @@
 import { supabaseBrowserClient } from '../lib/supabaseBrowserClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   Container,
@@ -16,12 +16,11 @@ import {
   Card,
   ScrollArea,
   Flex,
-  ActionIcon,
   Loader,
   Stack,
-  Avatar
+  Avatar,
+  Badge
 } from '@mantine/core';
-import { IconArrowLeft, IconArrowRight } from '@tabler/icons-react';
 
 // --- 型定義 ---
 type Report = {
@@ -30,6 +29,7 @@ type Report = {
   free_summary: string;
   price: number;
   stripe_price_id: string;
+  category_id: string; // ⬅️ これを使って振り分けます
   profiles: {
     username: string;
     avatar_url: string;
@@ -47,7 +47,6 @@ type Category = {
 export default function Home() {
   const router = useRouter();
   const supabase = supabaseBrowserClient;
-  const viewportRef = useRef<HTMLDivElement>(null);
 
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -64,18 +63,21 @@ export default function Home() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setUser(user);
 
+      // カテゴリ一覧
       const { data: categoriesData } = await supabase
         .from('categories')
         .select('id, name')
         .order('name', { ascending: true });
       setCategories(categoriesData || []);
 
-      const { data: reportsData } = await supabase
+      // レポート一覧 (category_id も取得！)
+      const { data: reportsData, error: reportsError } = await supabase
         .from('reports')
         .select(`
-          report_id, title, free_summary, price, stripe_price_id,
+          report_id, title, free_summary, price, stripe_price_id, category_id,
           profiles (username, avatar_url)
         `);
+
       if (reportsData) {
         const formattedReports = reportsData.map((item: any) => ({
           ...item,
@@ -116,12 +118,6 @@ export default function Home() {
       alert('決済処理中にエラーが発生しました。');
     }
   }
-
-  const handleScroll = (scrollAmount: number) => {
-    if (viewportRef.current) {
-      viewportRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-    }
-  };
 
   if (isLoading) {
     return (
@@ -178,50 +174,68 @@ export default function Home() {
 
       {/* --- メインコンテンツ --- */}
       <Box component="main" p="md" style={{ flex: 1, overflow: 'hidden' }}>
-        <Title order={1}>失敗データベース</Title>
-        <Text c="dimmed">過去の失敗から学び、未来の成功確率を高めましょう。</Text>
+        <Title order={1} mb="xl">失敗データベース</Title>
 
-        <Group position="apart" style={{ marginTop: '30px' }}>
-          <Title order={2}>失敗レポート一覧</Title>
-          <Group spacing="xs">
-            <ActionIcon variant="default" onClick={() => handleScroll(-320)}><IconArrowLeft size={16} /></ActionIcon>
-            <ActionIcon variant="default" onClick={() => handleScroll(320)}><IconArrowRight size={16} /></ActionIcon>
-          </Group>
-        </Group>
+        {/* ⬇️ カテゴリごとにループしてセクションを作る！ */}
+        <Stack spacing={50}>
+          {categories.map((category) => {
+            // このカテゴリに属するレポートだけを抽出
+            const categoryReports = reports.filter(r => r.category_id === category.id);
 
-        {reports.length === 0 ? (
-          <Text>まだレポートはありません。</Text>
-        ) : (
-          <ScrollArea style={{ marginTop: '20px' }} viewportRef={viewportRef} type="never">
-            <Flex gap="md">
-              {reports.map((report: Report) => (
-                <Card shadow="sm" padding="lg" radius="md" withBorder key={report.report_id} style={{ minWidth: 320 }}>
+            // レポートがないカテゴリは表示しない（表示したい場合はこのifを消す）
+            if (categoryReports.length === 0) return null;
 
-                  <Group mb="sm">
-                    <Avatar src={report.profiles?.avatar_url} radius="xl" size="sm" />
-                    <Text size="sm" weight={500}>
-                      {report.profiles?.username || '名無しさん'}
-                    </Text>
-                  </Group>
+            return (
+              <Box key={category.id}>
+                {/* カテゴリタイトル */}
+                <Group position="apart" mb="md">
+                  <Title order={3}>{category.name}</Title>
+                  <Button component={Link} href={`/category/${category.id}`} variant="subtle" size="xs">
+                    もっと見る
+                  </Button>
+                </Group>
 
-                  <Link href={`/reports/${report.report_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <Title order={4} mb="xs">{report.title}</Title>
-                    <Text size="sm" c="dimmed" lineClamp={3}>
-                      {report.free_summary}
-                    </Text>
-                  </Link>
+                {/* 横スクロールエリア */}
+                <ScrollArea type="hover" offsetScrollbars>
+                  <Flex gap="md" pb="sm">
+                    {categoryReports.map((report) => (
+                      <Card shadow="sm" padding="lg" radius="md" withBorder key={report.report_id} style={{ minWidth: 300, maxWidth: 300 }}>
 
-                  <Group position="apart" style={{ marginTop: '15px' }}>
-                    <Text weight={500}>価格: {report.price}円</Text>
-                    <Button color="green" onClick={() => handleCheckout(report.stripe_price_id)} disabled={!report.stripe_price_id} size="xs">
-                      購入する
-                    </Button>
-                  </Group>
-                </Card>
-              ))}
-            </Flex>
-          </ScrollArea>
-        )}
+                        <Group mb="sm">
+                          <Avatar src={report.profiles?.avatar_url} radius="xl" size="sm" />
+                          <Text size="xs" weight={500} color="dimmed">
+                            {report.profiles?.username || '名無し'}
+                          </Text>
+                        </Group>
+
+                        <Link href={`/reports/${report.report_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                          <Title order={5} mb="xs" lineClamp={1} title={report.title}>
+                            {report.title}
+                          </Title>
+                          <Text size="sm" c="dimmed" lineClamp={2} mb="md" style={{ height: '40px' }}>
+                            {report.free_summary}
+                          </Text>
+                        </Link>
+
+                        <Group position="apart" mt="auto">
+                          <Badge color="gray" variant="light">{report.price}円</Badge>
+                          <Button color="green" onClick={() => handleCheckout(report.stripe_price_id)} disabled={!report.stripe_price_id} size="xs" compact>
+                            購入
+                          </Button>
+                        </Group>
+                      </Card>
+                    ))}
+                  </Flex>
+                </ScrollArea>
+              </Box>
+            );
+          })}
+
+          {/* 全件表示用の予備セクション（必要なら） */}
+          {reports.length === 0 && (
+            <Text c="dimmed" align="center" mt="xl">レポートはまだありません。</Text>
+          )}
+        </Stack>
       </Box>
     </Flex>
   );
