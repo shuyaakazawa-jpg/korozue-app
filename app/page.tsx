@@ -4,7 +4,7 @@
 import { supabaseBrowserClient } from '../lib/supabaseBrowserClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import {
   Container,
@@ -16,13 +16,13 @@ import {
   Card,
   ScrollArea,
   Flex,
+  ActionIcon,
   Loader,
   Stack,
   Avatar,
-  Badge, // ⬅️ ⭐️ これを追加しました！
-  ActionIcon // ⬅️ ついでにこれも念のため
+  Badge
 } from '@mantine/core';
-import { IconArrowLeft, IconArrowRight } from '@tabler/icons-react'; // ⬅️ アイコンも念のため
+import { IconArrowLeft, IconArrowRight } from '@tabler/icons-react';
 
 // --- 型定義 ---
 type Report = {
@@ -49,6 +49,7 @@ type Category = {
 export default function Home() {
   const router = useRouter();
   const supabase = supabaseBrowserClient;
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -65,15 +66,13 @@ export default function Home() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setUser(user);
 
-      // カテゴリ一覧
       const { data: categoriesData } = await supabase
         .from('categories')
         .select('id, name')
         .order('name', { ascending: true });
       setCategories(categoriesData || []);
 
-      // レポート一覧
-      const { data: reportsData, error: reportsError } = await supabase
+      const { data: reportsData } = await supabase
         .from('reports')
         .select(`
           report_id, title, free_summary, price, stripe_price_id, category_id,
@@ -121,6 +120,12 @@ export default function Home() {
     }
   }
 
+  const handleScroll = (scrollAmount: number) => {
+    if (viewportRef.current) {
+      viewportRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   if (isLoading) {
     return (
       <Container style={{ paddingTop: '100px', textAlign: 'center' }}>
@@ -132,7 +137,7 @@ export default function Home() {
 
   return (
     <Flex>
-      {/* --- サイドバー --- */}
+      {/* --- サイドバー (変更なし) --- */}
       <Box
         component="nav"
         p="md"
@@ -176,8 +181,8 @@ export default function Home() {
 
       {/* --- メインコンテンツ --- */}
       <Box component="main" p="md" style={{ flex: 1, overflow: 'hidden' }}>
+        <Title order={1} mb="xl">失敗データベース</Title>
 
-        {/* カテゴリごとにループ */}
         <Stack spacing={50}>
           {categories.map((category) => {
             const categoryReports = reports.filter(r => r.category_id === category.id);
@@ -195,27 +200,42 @@ export default function Home() {
                 <ScrollArea type="hover" offsetScrollbars>
                   <Flex gap="md" pb="sm">
                     {categoryReports.map((report) => (
-                      <Card shadow="sm" padding="lg" radius="md" withBorder key={report.report_id} style={{ minWidth: 300, maxWidth: 300 }}>
+                      <Card
+                        shadow="sm"
+                        padding="md" // ⬅️ パディングを少し小さく
+                        radius="md"
+                        withBorder
+                        key={report.report_id}
+                        // ⬇️ ⭐️ ここがポイント！画面サイズで幅を変える設定 ⭐️
+                        sx={(theme: any) => ({
+                          minWidth: 160, // スマホ: 160px (これで2.5個くらい並びます)
+                          [theme.fn.largerThan('xs')]: {
+                            minWidth: 200, // 少し大きいスマホ
+                          },
+                          [theme.fn.largerThan('sm')]: {
+                            minWidth: 320, // PC/タブレット: 320px (元の大きさ)
+                          },
+                        })}
+                      >
 
-                        <Group mb="sm">
+                        <Group mb="xs">
                           <Avatar src={report.profiles?.avatar_url} radius="xl" size="sm" />
-                          <Text size="xs" weight={500} color="dimmed">
+                          <Text size="xs" weight={500} color="dimmed" truncate>
                             {report.profiles?.username || '名無し'}
                           </Text>
                         </Group>
 
                         <Link href={`/reports/${report.report_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                          <Title order={5} mb="xs" lineClamp={1} title={report.title}>
+                          <Title order={5} mb="xs" lineClamp={1} title={report.title} size="sm">
                             {report.title}
                           </Title>
-                          <Text size="sm" c="dimmed" lineClamp={2} mb="md" style={{ height: '40px' }}>
+                          <Text size="xs" c="dimmed" lineClamp={3} mb="md" style={{ height: '45px' }}>
                             {report.free_summary}
                           </Text>
                         </Link>
 
                         <Group position="apart" mt="auto">
-                          {/* ⬇️ ここで Badge を使っています！ */}
-                          <Badge color="gray" variant="light">{report.price}円</Badge>
+                          <Badge color="gray" variant="light" size="sm">{report.price}円</Badge>
                           <Button color="green" onClick={() => handleCheckout(report.stripe_price_id)} disabled={!report.stripe_price_id} size="xs" compact>
                             購入
                           </Button>
