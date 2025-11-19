@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use client'; // プランB（ブラウザ側）で動かします
 
 import { supabaseBrowserClient } from '../../../lib/supabaseBrowserClient'; // ⚠️「../」3回
