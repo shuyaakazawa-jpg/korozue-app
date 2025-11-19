@@ -137,29 +137,22 @@ export default function Home() {
 
   return (
     <Flex>
-      {/* --- サイドバー (変更なし) --- */}
+      {/* --- サイドバー --- */}
       <Box
         component="nav"
         p="md"
-        sx={(theme: any) => ({
-          display: 'none',
-          [theme.fn.largerThan('sm')]: {
-            display: 'block',
-          },
+        visibleFrom="sm" // ⬅️ ⭐️ 【重要】スマホ(sm未満)では非表示にする設定！
+        style={{
           minWidth: 240,
-          borderRight: `1px solid ${theme.colors.gray[2]}`,
+          borderRight: '1px solid lightgray',
           minHeight: '100vh'
-        })}
+        }}
       >
-        <Text weight={700} mb="md" size="lg">カテゴリ</Text>
-        <Stack spacing="xs">
+        <Text fw={700} mb="md" size="lg">カテゴリ</Text>
+        <Stack gap="xs"> {/* spacing ではなく gap */}
           <Text
             component={Link} href="/" size="sm" c="dimmed"
-            sx={(theme: any) => ({
-              display: 'block', padding: '8px 12px', borderRadius: theme.radius.sm,
-              '&:hover': { backgroundColor: theme.colors.gray[0], color: theme.black, transform: 'scale(1.02)' },
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'all 0.1s ease',
-            })}
+            style={{ display: 'block', padding: '8px 12px' }}
           >
             すべて
           </Text>
@@ -167,11 +160,7 @@ export default function Home() {
             <Text
               key={category.id}
               component={Link} href={`/category/${category.id}`} size="sm" c="dimmed"
-              sx={(theme: any) => ({
-                display: 'block', padding: '8px 12px', borderRadius: theme.radius.sm,
-                '&:hover': { backgroundColor: theme.colors.gray[0], color: theme.black, transform: 'scale(1.02)' },
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'all 0.1s ease',
-              })}
+              style={{ display: 'block', padding: '8px 12px' }}
             >
               {category.name}
             </Text>
@@ -181,17 +170,17 @@ export default function Home() {
 
       {/* --- メインコンテンツ --- */}
       <Box component="main" p="md" style={{ flex: 1, overflow: 'hidden' }}>
-        <Title order={1} mb="xl">失敗データベース</Title>
+        <Title order={1} mb="xl" size="h2">失敗データベース</Title>
 
-        <Stack spacing={50}>
+        <Stack gap={50}> {/* spacing ではなく gap */}
           {categories.map((category) => {
             const categoryReports = reports.filter(r => r.category_id === category.id);
             if (categoryReports.length === 0) return null;
 
             return (
               <Box key={category.id}>
-                <Group position="apart" mb="md">
-                  <Title order={3}>{category.name}</Title>
+                <Group justify="space-between" mb="md"> {/* position="apart" ではなく justify="space-between" */}
+                  <Title order={3} size="h4">{category.name}</Title>
                   <Button component={Link} href={`/category/${category.id}`} variant="subtle" size="xs">
                     もっと見る
                   </Button>
@@ -202,41 +191,64 @@ export default function Home() {
                     {categoryReports.map((report) => (
                       <Card
                         shadow="sm"
-                        padding="md" // ⬅️ パディングを少し小さく
-                        radius="md"
                         withBorder
                         key={report.report_id}
-                        // ⬇️ ⭐️ ここがポイント！画面サイズで幅を変える設定 ⭐️
-                        sx={(theme: any) => ({
-                          minWidth: 160, // スマホ: 160px (これで2.5個くらい並びます)
-                          [theme.fn.largerThan('xs')]: {
-                            minWidth: 200, // 少し大きいスマホ
-                          },
-                          [theme.fn.largerThan('sm')]: {
-                            minWidth: 320, // PC/タブレット: 320px (元の大きさ)
-                          },
-                        })}
+                        // ⬇️ ⭐️ 【重要】スマホでは160px、PCでは320pxにする設定！
+                        miw={{ base: 160, sm: 320 }}
+                        padding={{ base: 'xs', sm: 'lg' }} // スマホでは余白も小さく
+                        radius="md"
                       >
 
-                        <Group mb="xs">
-                          <Avatar src={report.profiles?.avatar_url} radius="xl" size="sm" />
-                          <Text size="xs" weight={500} color="dimmed" truncate>
+                        <Group mb="xs" gap="xs">
+                          <Avatar
+                            src={report.profiles?.avatar_url}
+                            radius="xl"
+                            // ⬇️ アイコンサイズもスマホで小さく
+                            size={{ base: 'xs', sm: 'sm' }}
+                          />
+                          <Text
+                            // ⬇️ 文字サイズもスマホで小さく
+                            size={{ base: 'xs', sm: 'sm' }}
+                            fw={500}
+                            c="dimmed"
+                            truncate
+                          >
                             {report.profiles?.username || '名無し'}
                           </Text>
                         </Group>
 
                         <Link href={`/reports/${report.report_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                          <Title order={5} mb="xs" lineClamp={1} title={report.title} size="sm">
+                          <Title
+                            order={4}
+                            mb="xs"
+                            lineClamp={1}
+                            title={report.title}
+                            // ⬇️ タイトル文字サイズも小さく
+                            size={{ base: 'sm', sm: 'h4' }}
+                          >
                             {report.title}
                           </Title>
-                          <Text size="xs" c="dimmed" lineClamp={3} mb="md" style={{ height: '45px' }}>
+                          <Text
+                            c="dimmed"
+                            lineClamp={3}
+                            mb="md"
+                            // ⬇️ 本文文字サイズも小さく
+                            size={{ base: 'xs', sm: 'sm' }}
+                            style={{ height: '3.6em' }} // 高さ調整
+                          >
                             {report.free_summary}
                           </Text>
                         </Link>
 
-                        <Group position="apart" mt="auto">
+                        <Group justify="space-between" mt="auto">
                           <Badge color="gray" variant="light" size="sm">{report.price}円</Badge>
-                          <Button color="green" onClick={() => handleCheckout(report.stripe_price_id)} disabled={!report.stripe_price_id} size="xs" compact>
+                          <Button
+                            color="green"
+                            onClick={() => handleCheckout(report.stripe_price_id)}
+                            disabled={!report.stripe_price_id}
+                            size="xs"
+                            compact
+                          >
                             購入
                           </Button>
                         </Group>
