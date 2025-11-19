@@ -153,6 +153,7 @@ export default function CategoryPage() {
   return (
     <Flex>
       {/* --- サイドバー (トップページと同じ) --- */}
+      {/* @ts-ignore */}
       <Box
         component="nav"
         p="md"
