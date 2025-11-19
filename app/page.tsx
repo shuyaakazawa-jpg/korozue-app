@@ -4,9 +4,10 @@
 import { supabaseBrowserClient } from '../lib/supabaseBrowserClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import {
+  Burger,
   Container,
   Title,
   Text,
@@ -16,11 +17,14 @@ import {
   Card,
   ScrollArea,
   Flex,
+  ActionIcon,
   Loader,
   Stack,
   Avatar,
-  Badge
+  Drawer // ⬅️ 1. これを追加！ (スマホ用メニュー)
 } from '@mantine/core';
+import { IconArrowLeft, IconArrowRight } from '@tabler/icons-react';
+import { useDisclosure } from '@mantine/hooks';
 
 // --- 型定義 ---
 type Report = {
@@ -29,7 +33,7 @@ type Report = {
   free_summary: string;
   price: number;
   stripe_price_id: string;
-  category_id: string; // ⬅️ これを使って振り分けます
+  category_id: string;
   profiles: {
     username: string;
     avatar_url: string;
@@ -47,7 +51,9 @@ type Category = {
 export default function Home() {
   const router = useRouter();
   const supabase = supabaseBrowserClient;
+  const viewportRef = useRef<HTMLDivElement>(null);
 
+  const [opened, { toggle, close }] = useDisclosure(); // ⬅️ closeも使う
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -63,15 +69,13 @@ export default function Home() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setUser(user);
 
-      // カテゴリ一覧
       const { data: categoriesData } = await supabase
         .from('categories')
         .select('id, name')
         .order('name', { ascending: true });
       setCategories(categoriesData || []);
 
-      // レポート一覧 (category_id も取得！)
-      const { data: reportsData, error: reportsError } = await supabase
+      const { data: reportsData } = await supabase
         .from('reports')
         .select(`
           report_id, title, free_summary, price, stripe_price_id, category_id,
@@ -119,6 +123,12 @@ export default function Home() {
     }
   }
 
+  const handleScroll = (scrollAmount: number) => {
+    if (viewportRef.current) {
+      viewportRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   if (isLoading) {
     return (
       <Container style={{ paddingTop: '100px', textAlign: 'center' }}>
@@ -129,29 +139,17 @@ export default function Home() {
   }
 
   return (
-    <Flex>
-      {/* --- サイドバー --- */}
-      <Box
-        component="nav"
-        p="md"
-        sx={(theme: any) => ({
-          display: 'none',
-          [theme.fn.largerThan('sm')]: {
-            display: 'block',
-          },
-          minWidth: 240,
-          borderRight: `1px solid ${theme.colors.gray[2]}`,
-          minHeight: '100vh'
-        })}
-      >
-        <Text weight={700} mb="md" size="lg">カテゴリ</Text>
+    <>
+      {/* 2. ⬇️ スマホ用メニュー (Drawer) を追加！
+         opened が true の時だけ、画面に覆いかぶさって表示されます
+      */}
+      <Drawer opened={opened} onClose={close} title="カテゴリ" size="xs">
         <Stack spacing="xs">
           <Text
-            component={Link} href="/" size="sm" c="dimmed"
+            component={Link} href="/" size="sm" c="dimmed" onClick={close} // クリックしたら閉じる
             sx={(theme: any) => ({
-              display: 'block', padding: '8px 12px', borderRadius: theme.radius.sm,
-              '&:hover': { backgroundColor: theme.colors.gray[0], color: theme.black, transform: 'scale(1.02)' },
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'all 0.1s ease',
+              display: 'block', padding: '12px', borderRadius: theme.radius.sm,
+              '&:hover': { backgroundColor: theme.colors.gray[0] }
             })}
           >
             すべて
@@ -159,83 +157,121 @@ export default function Home() {
           {categories.map((category) => (
             <Text
               key={category.id}
-              component={Link} href={`/category/${category.id}`} size="sm" c="dimmed"
+              component={Link} href={`/category/${category.id}`} size="sm" c="dimmed" onClick={close}
               sx={(theme: any) => ({
-                display: 'block', padding: '8px 12px', borderRadius: theme.radius.sm,
-                '&:hover': { backgroundColor: theme.colors.gray[0], color: theme.black, transform: 'scale(1.02)' },
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'all 0.1s ease',
+                display: 'block', padding: '12px', borderRadius: theme.radius.sm,
+                '&:hover': { backgroundColor: theme.colors.gray[0] }
               })}
             >
               {category.name}
             </Text>
           ))}
         </Stack>
-      </Box>
+      </Drawer>
 
-      {/* --- メインコンテンツ --- */}
-      <Box component="main" p="md" style={{ flex: 1, overflow: 'hidden' }}>
 
-        {/* ⬇️ カテゴリごとにループしてセクションを作る！ */}
-        <Stack spacing={50}>
-          {categories.map((category) => {
-            // このカテゴリに属するレポートだけを抽出
-            const categoryReports = reports.filter(r => r.category_id === category.id);
-
-            // レポートがないカテゴリは表示しない（表示したい場合はこのifを消す）
-            if (categoryReports.length === 0) return null;
-
-            return (
-              <Box key={category.id}>
-                {/* カテゴリタイトル */}
-                <Group position="apart" mb="md">
-                  <Title order={3}>{category.name}</Title>
-                  <Button component={Link} href={`/category/${category.id}`} variant="subtle" size="xs">
-                    もっと見る
-                  </Button>
-                </Group>
-
-                {/* 横スクロールエリア */}
-                <ScrollArea type="hover" offsetScrollbars>
-                  <Flex gap="md" pb="sm">
-                    {categoryReports.map((report) => (
-                      <Card shadow="sm" padding="lg" radius="md" withBorder key={report.report_id} style={{ minWidth: 300, maxWidth: 300 }}>
-
-                        <Group mb="sm">
-                          <Avatar src={report.profiles?.avatar_url} radius="xl" size="sm" />
-                          <Text size="xs" weight={500} color="dimmed">
-                            {report.profiles?.username || '名無し'}
-                          </Text>
-                        </Group>
-
-                        <Link href={`/reports/${report.report_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                          <Title order={5} mb="xs" lineClamp={1} title={report.title}>
-                            {report.title}
-                          </Title>
-                          <Text size="sm" c="dimmed" lineClamp={2} mb="md" style={{ height: '40px' }}>
-                            {report.free_summary}
-                          </Text>
-                        </Link>
-
-                        <Group position="apart" mt="auto">
-                          <Badge color="gray" variant="light">{report.price}円</Badge>
-                          <Button color="green" onClick={() => handleCheckout(report.stripe_price_id)} disabled={!report.stripe_price_id} size="xs" compact>
-                            購入
-                          </Button>
-                        </Group>
-                      </Card>
-                    ))}
-                  </Flex>
-                </ScrollArea>
-              </Box>
-            );
+      <Flex>
+        {/* --- PC用サイドバー (変更なし) --- */}
+        <Box
+          component="nav"
+          p="md"
+          sx={(theme: any) => ({
+            display: 'none',
+            [theme.fn.largerThan('sm')]: {
+              display: 'block',
+            },
+            minWidth: 240,
+            borderRight: `1px solid ${theme.colors.gray[2]}`,
+            minHeight: '100vh'
           })}
+        >
+          <Text weight={700} mb="md" size="lg">カテゴリ</Text>
+          <Stack spacing="xs">
+            <Text
+              component={Link} href="/" size="sm" c="dimmed"
+              sx={(theme: any) => ({
+                display: 'block', padding: '8px 12px', borderRadius: theme.radius.sm,
+                '&:hover': { backgroundColor: theme.colors.gray[0], color: theme.black, transform: 'scale(1.02)' },
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'all 0.1s ease',
+              })}
+            >
+              すべて
+            </Text>
+            {categories.map((category) => (
+              <Text
+                key={category.id}
+                component={Link} href={`/category/${category.id}`} size="sm" c="dimmed"
+                sx={(theme: any) => ({
+                  display: 'block', padding: '8px 12px', borderRadius: theme.radius.sm,
+                  '&:hover': { backgroundColor: theme.colors.gray[0], color: theme.black, transform: 'scale(1.02)' },
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'all 0.1s ease',
+                })}
+              >
+                {category.name}
+              </Text>
+            ))}
+          </Stack>
+        </Box>
 
-          {/* 全件表示用の予備セクション（必要なら） */}
-          {reports.length === 0 && (
-            <Text c="dimmed" align="center" mt="xl">レポートはまだありません。</Text>
-          )}
-        </Stack>
-      </Box>
-    </Flex>
+        {/* --- メインコンテンツ (変更なし) --- */}
+        <Box component="main" p="md" style={{ flex: 1, overflow: 'hidden' }}>
+          <Title order={1} mb="xl">失敗データベース</Title>
+
+          <Stack spacing={50}>
+            {categories.map((category) => {
+              const categoryReports = reports.filter(r => r.category_id === category.id);
+              if (categoryReports.length === 0) return null;
+
+              return (
+                <Box key={category.id}>
+                  <Group position="apart" mb="md">
+                    <Title order={3}>{category.name}</Title>
+                    <Button component={Link} href={`/category/${category.id}`} variant="subtle" size="xs">
+                      もっと見る
+                    </Button>
+                  </Group>
+
+                  <ScrollArea type="hover" offsetScrollbars>
+                    <Flex gap="md" pb="sm">
+                      {categoryReports.map((report) => (
+                        <Card shadow="sm" padding="lg" radius="md" withBorder key={report.report_id} style={{ minWidth: 300, maxWidth: 300 }}>
+
+                          <Group mb="sm">
+                            <Avatar src={report.profiles?.avatar_url} radius="xl" size="sm" />
+                            <Text size="xs" weight={500} color="dimmed">
+                              {report.profiles?.username || '名無し'}
+                            </Text>
+                          </Group>
+
+                          <Link href={`/reports/${report.report_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                            <Title order={5} mb="xs" lineClamp={1} title={report.title}>
+                              {report.title}
+                            </Title>
+                            <Text size="sm" c="dimmed" lineClamp={2} mb="md" style={{ height: '40px' }}>
+                              {report.free_summary}
+                            </Text>
+                          </Link>
+
+                          <Group position="apart" mt="auto">
+                            <Badge color="gray" variant="light">{report.price}円</Badge>
+                            <Button color="green" onClick={() => handleCheckout(report.stripe_price_id)} disabled={!report.stripe_price_id} size="xs" compact>
+                              購入
+                            </Button>
+                          </Group>
+                        </Card>
+                      ))}
+                    </Flex>
+                  </ScrollArea>
+                </Box>
+              );
+            })}
+
+            {reports.length === 0 && (
+              <Text c="dimmed" align="center" mt="xl">レポートはまだありません。</Text>
+            )}
+          </Stack>
+        </Box>
+      </Flex>
+    </>
   );
 }
