@@ -174,7 +174,6 @@ export default function Home() {
 
       {/* --- メインコンテンツ --- */}
       <Box component="main" p="md" style={{ flex: 1, overflow: 'hidden' }}>
-        <Title order={1} mb="xl">失敗データベース</Title>
 
         {/* ⬇️ カテゴリごとにループしてセクションを作る！ */}
         <Stack spacing={50}>
